@@ -1,0 +1,6 @@
+/venv/
+/.venv/
+/core/config.py
+/log
+/migrations
+/pyproject.toml
