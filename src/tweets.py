@@ -1,9 +1,10 @@
 from ntscraper import Nitter
-from models.tweets import Tweets #, UserInfo
+from models.tweets import Tweets 
 from core.logger import log
 from .ding import message_dingding_api
 from datetime import datetime
 from utils.date import format_date
+import re
 
 scraper = None
 
@@ -24,7 +25,7 @@ async def batch_query_users_tweets(usernames):
     for username in usernames:
         # 获取用户推文
         try:
-            new_tweets = scraper.get_tweets(username, mode="user", number=3, max_retries=1)
+            new_tweets = scraper.get_tweets(username, mode="user", number=10, max_retries=1)
             # 查询对应数据库
             db_tweets = await Tweets.filter(tweet_username=username).all()
             # 筛出link
@@ -48,15 +49,20 @@ async def batch_query_users_tweets(usernames):
                     else:
                         data["title"] = username + "有新推文!"
                         log.info(f"{username} --- 有新推文")
-                    
+
+                    # 唯一id
+                    tweet["only"] = re.sub(r'[^a-zA-Z0-9]', '', username + str(tweet["is-retweet"]) + tweet["user"]["username"] + tweet["user"]["profile_id"] + tweet["link"])
+                 
+                    log.debug(tweet)
+                     # 推送消息到钉钉
+                    # message_dingding_api(data)
                     # 保存推文
                     await save_user_tweets(username, tweet)
-                     # 推送消息到钉钉
-                    message_dingding_api(data)
 
         except Exception as e:
             log.error(f"查询发生错误:{e}")
     scraper = None
+    log.debug("单次任务查询完毕！")
 
 
 
@@ -67,29 +73,33 @@ async def batch_save_users_tweets(usernames):
     log.info("开始添加新用户到数据库")
     scraper = Nitter()
     for username in usernames:
-        new_user_tweets = scraper.get_tweets(username, mode="user", number=100,max_retries=1)
+        new_user_tweets = scraper.get_tweets(username, mode="user", number=10,max_retries=1)
         
         # 批量存储推文到数据库
         for tweet in new_user_tweets["tweets"]:
-           await save_user_tweets(username,tweet)
+            tweet["only"] = re.sub(r'[^a-zA-Z0-9]', '', username + str(tweet["is-retweet"]) + tweet["user"]["username"] + tweet["user"]["profile_id"] + tweet["link"])
+            await save_user_tweets(username,tweet)
 
     log.info("添加新用户结束")
 
 """"
+
 推文存储数据库
 """
 async def save_user_tweets(username, tweet):
     try:
+        log.debug(tweet["only"])
         tw, created = await Tweets.get_or_create(
-            link=tweet["link"],
+            only=tweet["only"],
             tweet_username= username,
-            text= tweet["text"],
-            user= tweet["user"],
-            date= tweet["date"],
             is_retweet= tweet["is-retweet"],
-            external_link= tweet["external-link"],
-            quoted_post= tweet["quoted-post"],
-            stats= tweet["stats"],
+            link=tweet["link"],
+            text=tweet["text"],
+            user=tweet["user"],
+            date=tweet["date"],
+            external_link=tweet["external-link"],
+            quoted_post=tweet["quoted-post"],
+            stats=tweet["stats"],
             # pictures= tweet["pictures"],
             # videos= tweet["videos"],
             # gifs= tweet["gifs"]

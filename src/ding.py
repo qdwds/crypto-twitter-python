@@ -1,12 +1,12 @@
 
 import requests
 from core.logger import log
-from core.config import MESSAGE_DINGDING
+from core.config import config
 
 
 """推送到消息到 Message 钉钉群"""
 def message_dingding_api(data):
-    url = "https://oapi.dingtalk.com/robot/send?access_token=" + MESSAGE_DINGDING
+    url = "https://oapi.dingtalk.com/robot/send?access_token=" + config.MESSAGE_DINGDING
     d = {
         "text": {
             "content": 
